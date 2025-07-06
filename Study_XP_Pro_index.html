@@ -1,0 +1,279 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Study XP Pro</title>
+  <style>
+    :root {
+      --primary: #4CAF50;
+      --secondary: #2196F3;
+      --light-bg: #f0f9ff;
+      --text: #333;
+    }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: var(--light-bg);
+      color: var(--text);
+      text-align: center;
+      padding: 40px 20px;
+      max-width: 900px;
+      margin: auto;
+    }
+    h1 {
+      font-size: 2.4em;
+      color: var(--primary);
+      margin-bottom: 0.5em;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .xp-display, .streak-display, .goal-display, .smart-goal-display {
+      font-size: 1.1em;
+      margin: 10px;
+      color: var(--primary);
+    }
+    .goal-bar {
+      width: 100%;
+      height: 18px;
+      background: #e0e0e0;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .goal-fill {
+      height: 100%;
+      background: var(--primary);
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+    button {
+      margin: 10px 5px;
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      background-color: var(--secondary);
+      color: white;
+      cursor: pointer;
+      transition: transform 0.2s, background-color 0.3s;
+    }
+    button:hover {
+      background-color: #0b7dda;
+      transform: scale(1.05);
+    }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      margin-top: 20px;
+      padding: 10px;
+    }
+    .day {
+      width: 100%;
+      padding: 8px 0;
+      border-radius: 6px;
+      background: #eeeeee;
+      font-size: 14px;
+    }
+    .day.studied {
+      background-color: var(--primary);
+      color: white;
+      font-weight: bold;
+    }
+    .log {
+      text-align: left;
+      margin-top: 20px;
+      font-size: 14px;
+      max-height: 180px;
+      overflow-y: auto;
+      background: #fafafa;
+      padding: 10px;
+      border-radius: 10px;
+    }
+    .treat {
+      font-size: 20px;
+      color: #e91e63;
+      margin-top: 12px;
+      font-weight: bold;
+    }
+    .summary {
+      font-size: 16px;
+      margin-top: 20px;
+      color: #555;
+    }
+    input[type="text"], input[type="number"] {
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin: 5px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎓 Study XP Pro</h1>
+
+  <div class="card">
+    <div class="xp-display">Total XP: <span id="xp">0</span></div>
+    <div class="streak-display">🔥 Streak: <span id="streak">0</span> days</div>
+    <div class="goal-display">🎯 Fixed Goal: 250 XP/day</div>
+    <div class="smart-goal-display">🧠 Smart Goal: <span id="smartGoal">--</span> XP/day</div>
+    <div class="goal-bar"><div class="goal-fill" id="goalFill"></div></div>
+  </div>
+
+  <div class="card">
+    <button onclick="addXP('Study 1/2 Hour', 25)">Study 1/2 Hour (+25 XP)</button>
+    <button onclick="addXP('Study 1 Hour', 50)">Study 1 Hour (+50 XP)</button>
+    <button onclick="addXP('Read a Chapter', 100)">Read a Chapter (+100 XP)</button>
+    <button onclick="addXP('Write a Chapter', 150)">Write a Chapter (+150 XP)</button>
+    <button onclick="addXP('Complete a Chapter', 200)">Complete a Chapter (+200 XP)</button>
+    <button onclick="addXP('Practice Math Problems', 75)">Practice Math Problems (+75 XP)</button>
+    <button onclick="addXP('Revise Notes', 60)">Revise Notes (+60 XP)</button>
+    <button onclick="addXP('Watch Educational Video', 80)">Watch Educational Video (+80 XP)</button>
+    <button onclick="addXP('Solve a Quiz/Test', 110)">Solve a Quiz/Test (+110 XP)</button>
+  </div>
+
+  <div class="card">
+    <h3>Add Custom Task</h3>
+    <input type="text" id="customTask" placeholder="Task Name">
+    <input type="number" id="customXP" placeholder="XP Value">
+    <button onclick="addCustomTask()">Add Custom Task</button>
+  </div>
+
+  <div id="treatMessage" class="treat"></div>
+  <div class="calendar" id="calendar"></div>
+  <div class="summary" id="summary"></div>
+  <div class="log" id="log"></div>
+
+  <script>
+    let totalXP = parseInt(localStorage.getItem('xp')) || 0;
+    let streak = parseInt(localStorage.getItem('streak')) || 0;
+    let lastDate = localStorage.getItem('lastStudyDate');
+    let lastTreatXP = parseInt(localStorage.getItem('lastTreatXP')) || 0;
+    const xpPerDay = JSON.parse(localStorage.getItem('xpPerDay')) || {};
+    const today = new Date().toDateString();
+
+    function updateDisplay() {
+      document.getElementById('xp').textContent = totalXP;
+      document.getElementById('streak').textContent = streak;
+      renderCalendar();
+      updateGoalBar();
+      updateSummary();
+      updateSmartGoal();
+    }
+
+    function addXP(task, xp) {
+      const now = new Date().toDateString();
+      if (lastDate && new Date(now) - new Date(lastDate) > 86400000 * 1.5) {
+        totalXP = Math.max(0, totalXP - 500);
+        logMsg('⚠️ Missed a day! -500 XP');
+      }
+      if (lastDate !== now) {
+        streak++;
+        lastDate = now;
+        localStorage.setItem('streak', streak);
+        localStorage.setItem('lastStudyDate', now);
+      }
+      totalXP += xp;
+      xpPerDay[now] = (xpPerDay[now] || 0) + xp;
+      localStorage.setItem('xp', totalXP);
+      localStorage.setItem('xpPerDay', JSON.stringify(xpPerDay));
+      logMsg(`✅ ${task} — +${xp} XP`);
+
+      if (Math.floor(totalXP / 1000) > Math.floor(lastTreatXP / 1000)) {
+        const treats = ["🍦 Ice Cream Day!", "🎁 Surprise Gift!", "🎮 Gaming Hour!", "📺 Show Time!"];
+        const msg = treats[Math.floor(Math.random() * treats.length)];
+        document.getElementById('treatMessage').textContent = `🎉 ${msg}`;
+        lastTreatXP = totalXP;
+        localStorage.setItem('lastTreatXP', lastTreatXP);
+        setTimeout(() => document.getElementById('treatMessage').textContent = '', 4000);
+      }
+
+      updateDisplay();
+    }
+
+    function addCustomTask() {
+      const taskName = document.getElementById('customTask').value.trim();
+      const xpValue = parseInt(document.getElementById('customXP').value);
+      if (taskName && xpValue) {
+        addXP(taskName, xpValue);
+        document.getElementById('customTask').value = '';
+        document.getElementById('customXP').value = '';
+      }
+    }
+
+    function logMsg(text) {
+      const entry = document.createElement('div');
+      entry.textContent = text;
+      document.getElementById('log').prepend(entry);
+    }
+
+    function renderCalendar() {
+      const cal = document.getElementById('calendar');
+      cal.innerHTML = '<h3>📅 Study Calendar</h3>';
+      const now = new Date();
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date(now - i * 86400000);
+        const key = date.toDateString();
+        const div = document.createElement('div');
+        div.className = 'day';
+        div.title = `${key}: ${xpPerDay[key] || 0} XP`;
+        if (xpPerDay[key]) div.classList.add('studied');
+        div.textContent = date.getDate();
+        cal.appendChild(div);
+      }
+    }
+
+    function updateGoalBar() {
+      const goal = 250;
+      const todayXP = xpPerDay[today] || 0;
+      const percent = Math.min(100, (todayXP / goal) * 100);
+      document.getElementById('goalFill').style.width = percent + '%';
+    }
+
+    function updateSummary() {
+      const days = Object.keys(xpPerDay);
+      let total = 0;
+      days.forEach(day => total += xpPerDay[day]);
+      const avg = (total / days.length).toFixed(1);
+      document.getElementById('summary').textContent = `📊 You've earned ${total} XP across ${days.length} days. Daily average: ${avg} XP`;
+    }
+
+    function updateSmartGoal() {
+      const now = new Date();
+      const recentDays = [];
+      for (let i = 1; i <= 7; i++) {
+        const date = new Date(now - i * 86400000).toDateString();
+        if (xpPerDay[date]) recentDays.push(xpPerDay[date]);
+      }
+      if (recentDays.length > 0) {
+        const avg = Math.round(recentDays.reduce((a, b) => a + b, 0) / recentDays.length);
+        document.getElementById('smartGoal').textContent = avg;
+      } else {
+        document.getElementById('smartGoal').textContent = '--';
+      }
+    }
+
+    if ('Notification' in window) {
+      Notification.requestPermission().then(perm => {
+        if (perm === 'granted') {
+          const hour = new Date().getHours();
+          if (hour >= 18 && hour <= 20) {
+            new Notification('⏰ Time to Study!', {
+              body: 'Keep your streak alive and earn your XP!',
+              icon: 'https://cdn-icons-png.flaticon.com/512/190/190411.png'
+            });
+          }
+        }
+      });
+    }
+
+    updateDisplay();
+  </script>
+</body>
+</html>
